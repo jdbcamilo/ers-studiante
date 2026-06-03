@@ -1,5 +1,5 @@
 # Use pre-built PHP image with ALL Laravel extensions already installed
-FROM serversideup/php:8.3-fpm-nginx AS base
+FROM serversideup/php:8.4-fpm-nginx AS base
 
 # Switch to root for setup
 USER root
