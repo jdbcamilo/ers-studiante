@@ -1,141 +1,52 @@
-# ============================================================
-# Stage 1: Install PHP deps + generate wayfinder routes
-# ============================================================
-FROM php:8.3-cli-alpine AS php-deps
+# Use pre-built PHP image with ALL Laravel extensions already installed
+FROM serversideup/php:8.3-fpm-nginx AS base
 
-RUN apk add --no-cache sqlite-dev oniguruma-dev libxml2-dev icu-dev
-RUN docker-php-ext-install pdo_sqlite mbstring intl xml ctype tokenizer
+# Switch to root for setup
+USER root
 
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --prefer-dist --no-interaction
-
-COPY . .
-RUN composer dump-autoload --optimize --no-dev
-
-# Generate wayfinder routes and actions (needed for Vite build)
-RUN php artisan wayfinder:generate 2>/dev/null || true
-
-
-# ============================================================
-# Stage 2: Build frontend assets (Vite + React)
-# ============================================================
-FROM node:20-alpine AS frontend
-
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
-# Copy all source needed for build
-COPY resources/ resources/
-COPY vite.config.ts tsconfig.json components.json ./
-COPY public/ public/
-
-# Copy generated wayfinder/routes/actions from PHP stage
-COPY --from=php-deps /app/resources/js/wayfinder resources/js/wayfinder/
-COPY --from=php-deps /app/resources/js/actions resources/js/actions/
-COPY --from=php-deps /app/resources/js/routes resources/js/routes/
-
-# Build production assets
-RUN npm run build
-
-
-# ============================================================
-# Stage 3: PHP + Nginx production image
-# ============================================================
-FROM php:8.3-fpm-alpine AS production
-
-# Install system dependencies
-RUN apk add --no-cache \
-    nginx \
-    supervisor \
-    sqlite \
-    sqlite-dev \
-    curl \
-    zip \
-    unzip \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
-    oniguruma-dev \
-    libxml2-dev \
-    icu-dev \
-    linux-headers \
-    bash
-
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-    pdo_sqlite \
-    pdo_mysql \
-    mbstring \
-    exif \
-    pcntl \
-    bcmath \
-    gd \
-    intl \
-    xml \
-    ctype \
-    tokenizer
-
-# Install Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Install Node.js 20 + SQLite
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nodejs npm sqlite3 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy PHP deps from stage 1
-COPY --from=php-deps /app/vendor vendor/
+# Install Composer dependencies first (caching)
+COPY --chown=www-data:www-data composer.json composer.lock ./
+RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+
+# Install Node dependencies and build frontend
+COPY --chown=www-data:www-data package.json package-lock.json ./
+RUN npm ci
 
 # Copy all application code
-COPY . .
+COPY --chown=www-data:www-data . .
 
-# Generate optimized autoloader
-RUN composer dump-autoload --optimize --no-dev
+# Generate wayfinder routes (needed for Vite build)
+RUN composer dump-autoload --optimize --no-dev \
+    && php artisan wayfinder:generate 2>/dev/null || true
 
-# Copy generated routes/actions/wayfinder
-COPY --from=php-deps /app/resources/js/wayfinder resources/js/wayfinder/
-COPY --from=php-deps /app/resources/js/actions resources/js/actions/
-COPY --from=php-deps /app/resources/js/routes resources/js/routes/
+# Build frontend assets
+RUN npm run build
 
-# Copy built frontend assets from Stage 2
-COPY --from=frontend /app/public/build public/build
+# Clean up node_modules (not needed at runtime)
+RUN rm -rf node_modules
 
 # Create required directories
-RUN mkdir -p \
-    storage/framework/sessions \
-    storage/framework/views \
-    storage/framework/cache \
-    storage/logs \
-    database \
-    bootstrap/cache
+RUN mkdir -p storage/framework/{sessions,views,cache} storage/logs database bootstrap/cache \
+    && touch database/database.sqlite \
+    && chown -R www-data:www-data storage bootstrap/cache database
 
-# Set proper permissions
-RUN chown -R www-data:www-data \
-    storage \
-    bootstrap/cache \
-    database
+# Cache Laravel config
+RUN php artisan config:clear \
+    && php artisan route:clear \
+    && php artisan view:clear
 
-RUN chmod -R 775 \
-    storage \
-    bootstrap/cache \
-    database
+# Switch back to www-data
+USER www-data
 
-# Copy Nginx config
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
-
-# Copy supervisor config
-COPY docker/supervisord.conf /etc/supervisord.conf
-
-# Copy entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-# Expose port (Railway uses PORT env var)
-EXPOSE 8080
-
-# Start via entrypoint
-ENTRYPOINT ["docker-entrypoint.sh"]
+# The serversideup image handles Nginx + PHP-FPM automatically
+# Railway sets PORT env var, the image respects it via NGINX_LISTEN_PORT
+ENV NGINX_LISTEN_PORT=${PORT:-8080}
