@@ -44,6 +44,10 @@ RUN php artisan config:clear \
     && php artisan route:clear \
     && php artisan view:clear
 
+# Copy startup script to the correct location for serversideup images
+COPY docker-entrypoint.sh /etc/entrypoint.d/99-init-app.sh
+RUN chmod +x /etc/entrypoint.d/99-init-app.sh
+
 # Switch back to www-data
 USER www-data
 
