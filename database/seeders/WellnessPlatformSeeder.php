@@ -22,6 +22,12 @@ class WellnessPlatformSeeder extends Seeder
             User::factory()->admin()->raw()
         );
 
+        // Ensure a specific test student exists
+        $student = User::firstOrCreate(
+            ['email' => 'estudiante@cordoba.edu.co'],
+            array_merge(User::factory()->raw(), ['role' => 'student', 'name' => 'Estudiante de Prueba'])
+        );
+
         $studentCount = User::where('role', 'student')->count();
 
         if ($studentCount < 4) {
@@ -29,9 +35,6 @@ class WellnessPlatformSeeder extends Seeder
                 'role' => 'student',
             ]);
         }
-
-        $students = User::where('role', 'student')->orderBy('id')->get();
-        $student = $students->first();
 
         // 2. Define the 8 Real Clinical Questionnaires Catalog
         $questionnaires = [
