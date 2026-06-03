@@ -15,7 +15,7 @@ WORKDIR /var/www/html
 
 # Install Composer dependencies first (caching)
 COPY --chown=www-data:www-data composer.json composer.lock ./
-RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-interaction
+RUN composer install --no-scripts --no-autoloader --prefer-dist --no-interaction
 
 # Install Node dependencies and build frontend
 COPY --chown=www-data:www-data package.json package-lock.json ./
@@ -25,7 +25,7 @@ RUN npm ci
 COPY --chown=www-data:www-data . .
 
 # Generate wayfinder routes (needed for Vite build)
-RUN composer dump-autoload --optimize --no-dev \
+RUN composer dump-autoload --optimize \
     && php artisan wayfinder:generate 2>/dev/null || true
 
 # Build frontend assets
