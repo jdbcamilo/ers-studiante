@@ -21,85 +21,37 @@ class ChatController extends Controller
             return response()->json(['reply' => 'No he recibido ningún mensaje. ¿Cómo te sientes hoy?']);
         }
 
-        // 1. Professional, Unlimited DeepSeek API Integration (OpenAI compatible)
-        $deepseekKey = env('DEEPSEEK_API_KEY');
-        if (!empty($deepseekKey)) {
-            try {
-                $systemInstruction = "Eres un psicólogo y consejero de salud mental sumamente empático, cálido, respetuoso y profesional de la Universidad de Córdoba, Colombia. Responde en español de forma cariñosa, clara y concisa (máximo 3 oraciones) para ayudar al estudiante a calmarse ante el estrés académico o la ansiedad. Nunca menciones que eres una IA, mantén siempre el rol de consejero universitario.";
-                
-                $response = Http::timeout(10)->withHeaders([
-                    'Authorization' => "Bearer {$deepseekKey}",
-                    'Content-Type' => 'application/json'
-                ])->post("https://api.deepseek.com/chat/completions", [
-                    'model' => 'deepseek-chat',
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemInstruction],
-                        ['role' => 'user', 'content' => $message]
-                    ]
-                ]);
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    $replyText = $data['choices'][0]['message']['content'] ?? '';
-                    if (!empty(trim($replyText))) {
-                        return response()->json(['reply' => trim($replyText)]);
-                    }
-                }
-            } catch (\Exception $e) {
-                // Log and continue to Gemini fallback
-            }
-        }
-
-        // 2. High-Performance Google Gemini API Integration
         $geminiKey = env('GEMINI_API_KEY', 'AIzaSyDZwv8x18KG111kfIcnpIhwUq1kze779ps');
-        if (!empty($geminiKey)) {
-            try {
-                $systemInstruction = "Eres un psicólogo y consejero de salud mental sumamente empático, cálido, respetuoso y profesional de la Universidad de Córdoba, Colombia. Responde en español de forma cariñosa, clara y concisa (máximo 3 oraciones) para ayudar al estudiante a calmarse ante el estrés académico o la ansiedad. Nunca menciones que eres una IA, mantén siempre el rol de consejero universitario.";
-                
-                $response = Http::timeout(8)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                ['text' => "Instrucciones de Rol: {$systemInstruction}\n\nMensaje del estudiante: {$message}"]
-                            ]
+        
+        try {
+            $systemInstruction = "Eres un psicólogo y consejero de salud mental sumamente empático, cálido, respetuoso y profesional de la Universidad de Córdoba, Colombia. Responde en español de forma cariñosa, clara y concisa (máximo 3 oraciones) para ayudar al estudiante a calmarse ante el estrés académico o la ansiedad. Nunca menciones que eres una IA, mantén siempre el rol de consejero universitario.";
+            
+            $response = Http::timeout(10)->withHeaders([
+                'Content-Type' => 'application/json',
+            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => "Instrucciones de Rol: {$systemInstruction}\n\nMensaje del estudiante: {$message}"]
                         ]
                     ]
-                ]);
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    $replyText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-                    if (!empty(trim($replyText))) {
-                        return response()->json(['reply' => trim($replyText)]);
-                    }
-                }
-            } catch (\Exception $e) {
-                // Log and continue
-            }
-        }
-
-        // 3. Pollinations AI free text GET endpoint (as keyless public backup)
-        try {
-            $systemInstruction = "Instrucciones: Eres un psicólogo y consejero de salud mental sumamente empático, cálido, respetuoso y profesional de la Universidad de Córdoba, Colombia. Responde en español de forma cariñosa, clara y concisa (máximo 3 oraciones) para ayudar al estudiante a calmarse ante el estrés académico o la ansiedad. Nunca menciones que eres una IA, mantén siempre el rol de consejero universitario. Mensaje del estudiante: ";
-            // Clean characters like ?, ¿, #, & that break Nginx/Cloudflare URL path routing
-            $cleanMessage = str_replace(['?', '¿', '#', '&'], ' ', $message);
-            $prompt = urlencode($systemInstruction . $cleanMessage);
-            
-            $response = Http::timeout(12)->get("https://text.pollinations.ai/{$prompt}");
+                ]
+            ]);
 
             if ($response->successful()) {
-                $replyText = $response->body();
-                if (!empty(trim($replyText)) && !str_contains($replyText, 'error') && !str_contains($replyText, '429') && !str_contains($replyText, 'Queue full')) {
+                $data = $response->json();
+                $replyText = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+                if (!empty(trim($replyText))) {
                     return response()->json(['reply' => trim($replyText)]);
                 }
+            } else {
+                return response()->json(['reply' => 'Error de conexión con la IA de Google: ' . $response->body()]);
             }
         } catch (\Exception $e) {
-            // Continue to local fallback
+            return response()->json(['reply' => 'Excepción en el servidor: ' . $e->getMessage()]);
         }
-
-        // 3. Secondary Local Static Fallback
-        $reply = $this->getLocalResponse($message);
-        return response()->json(['reply' => $reply]);
+        
+        return response()->json(['reply' => 'Lo siento, no pude procesar tu mensaje correctamente en este momento.']);
     }
 
     private function getLocalResponse(string $message): string
