@@ -50,13 +50,13 @@ class ChatController extends Controller
             }
         }
 
-        // 2. High-Performance Google Gemini Free API Integration
-        $geminiKey = env('GEMINI_API_KEY');
+        // 2. High-Performance Google Gemini API Integration
+        $geminiKey = env('GEMINI_API_KEY', 'AIzaSyDZwv8x18KG111kfIcnpIhwUq1kze779ps');
         if (!empty($geminiKey)) {
             try {
                 $systemInstruction = "Eres un psicólogo y consejero de salud mental sumamente empático, cálido, respetuoso y profesional de la Universidad de Córdoba, Colombia. Responde en español de forma cariñosa, clara y concisa (máximo 3 oraciones) para ayudar al estudiante a calmarse ante el estrés académico o la ansiedad. Nunca menciones que eres una IA, mantén siempre el rol de consejero universitario.";
                 
-                $response = Http::timeout(8)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$geminiKey}", [
+                $response = Http::timeout(8)->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
                     'contents' => [
                         [
                             'parts' => [
@@ -74,7 +74,7 @@ class ChatController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                // Log and continue to Pollinations fallback
+                // Log and continue
             }
         }
 

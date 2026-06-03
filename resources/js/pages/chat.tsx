@@ -38,51 +38,25 @@ export default function Chat() {
         setIsTyping(true);
 
         try {
-            let botReply = '';
+            const csrfToken = decodeURIComponent(
+                document.cookie
+                    .split('; ')
+                    .find((row) => row.startsWith('XSRF-TOKEN='))
+                    ?.split('=')[1] || ''
+            );
 
-            // 1. Try to query Pollinations directly from the client side (using user's own IP to bypass server rate limits)
-            try {
-                const systemInstruction = "Instrucciones: Eres un psicólogo y consejero de salud mental sumamente empático, cálido, respetuoso y profesional de la Universidad de Córdoba, Colombia. Responde en español de forma cariñosa, clara y concisa (máximo 3 oraciones) para ayudar al estudiante a calmarse ante el estrés académico o la ansiedad. Nunca menciones que eres una IA, mantén siempre tu personaje. Mensaje del estudiante: ";
-                // Clean characters like ?, ¿, #, & that break Nginx/Cloudflare URL path routing
-                const cleanMsg = userMsg.replace(/[?¿#&]/g, ' ');
-                const fullPrompt = encodeURIComponent(systemInstruction + cleanMsg);
-                
-                const pollinationsRes = await fetch(`https://text.pollinations.ai/${fullPrompt}`, {
-                    signal: AbortSignal.timeout(6500) // Timeout after 6.5 seconds
-                });
+            const response = await fetch('/chat/message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ message: userMsg }),
+            });
 
-                if (pollinationsRes.ok) {
-                    const text = await pollinationsRes.text();
-                    if (text && !text.includes('error') && !text.includes('429') && !text.includes('Queue full')) {
-                        botReply = text.trim();
-                    }
-                }
-            } catch (pollinationsError) {
-                console.warn("Direct Pollinations fetch timed out or failed, falling back to server:", pollinationsError);
-            }
-
-            // 2. Fallback to server side controller if direct fetch was unsuccessful
-            if (!botReply) {
-                const csrfToken = decodeURIComponent(
-                    document.cookie
-                        .split('; ')
-                        .find((row) => row.startsWith('XSRF-TOKEN='))
-                        ?.split('=')[1] || ''
-                );
-
-                const response = await fetch('/chat/message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-XSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ message: userMsg }),
-                });
-
-                const data = await response.json();
-                botReply = data.reply || 'Disculpa, no obtuve una respuesta válida. ¿Podrías volver a intentar?';
-            }
+            const data = await response.json();
+            const botReply = data.reply || 'Disculpa, no obtuve una respuesta válida. ¿Podrías volver a intentar?';
 
             setMessages((prev) => [...prev, { sender: 'bot', text: botReply, time: 'Ahora' }]);
         } catch (error) {
