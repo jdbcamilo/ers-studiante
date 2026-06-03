@@ -29,7 +29,7 @@ export default function Users({ users }: any) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.data.map((user: any) => (
+                                {users.map((user: any) => (
                                     <tr key={user.id} className="border-b border-border/50 last:border-0">
                                         <td className="py-4">{user.name}</td>
                                         <td className="py-4">{user.email}</td>

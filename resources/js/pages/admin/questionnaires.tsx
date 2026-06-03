@@ -20,7 +20,7 @@ export default function Questionnaires({ questionnaires }: any) {
                 </div>
 
                 <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-                    {questionnaires.data.length === 0 ? (
+                    {questionnaires.length === 0 ? (
                         <div className="py-12 text-center text-muted-foreground">No hay cuestionarios creados aún.</div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -35,7 +35,7 @@ export default function Questionnaires({ questionnaires }: any) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {questionnaires.data.map((q: any) => (
+                                    {questionnaires.map((q: any) => (
                                         <tr key={q.id} className="border-b border-border/50 last:border-0">
                                             <td className="py-4 font-medium text-foreground">{q.title}</td>
                                             <td className="py-4 uppercase text-muted-foreground text-xs font-semibold tracking-wider">{q.type}</td>

@@ -17,7 +17,7 @@ export default function Feedbacks({ feedbacks }: any) {
                 </div>
 
                 <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-                    {feedbacks.data.length === 0 ? (
+                    {feedbacks.length === 0 ? (
                         <div className="py-12 text-center text-muted-foreground">No hay mensajes de feedback recientes.</div>
                     ) : (
                         <div className="overflow-x-auto">
@@ -33,7 +33,7 @@ export default function Feedbacks({ feedbacks }: any) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {feedbacks.data.map((f: any) => (
+                                    {feedbacks.map((f: any) => (
                                         <tr key={f.id} className="border-b border-border/50 last:border-0">
                                             <td className="py-4 whitespace-nowrap text-muted-foreground">{new Date(f.created_at).toLocaleDateString()}</td>
                                             <td className="py-4">{f.user?.name || 'Anónimo'}</td>
