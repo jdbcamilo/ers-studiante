@@ -28,7 +28,7 @@ class ChatController extends Controller
             
             $response = Http::timeout(10)->withHeaders([
                 'Content-Type' => 'application/json',
-            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$geminiKey}", [
+            ])->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={$geminiKey}", [
                 'contents' => [
                     [
                         'parts' => [
